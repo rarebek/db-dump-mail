@@ -55,12 +55,13 @@ func sendEmail() error {
 
 	// Convert comma-separated emails into a slice
 	receivers := strings.Split(receiverEmails, ",")
+	body := os.Getenv("MAILER_BODY")
 
 	m := gomail.NewMessage()
 	m.SetHeader("From", senderEmail)
 	m.SetHeader("To", receivers...) // Spread to handle multiple recipients
 	m.SetHeader("Subject", "PostgreSQL Backup")
-	m.SetBody("text/plain", "Find the attached PostgreSQL backup.")
+	m.SetBody("text/plain", body)
 	m.Attach(dumpFile)
 
 	d := gomail.NewDialer("smtp.gmail.com", 587, senderEmail, password)
