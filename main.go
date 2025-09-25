@@ -5,8 +5,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
 	"gopkg.in/gomail.v2"
 )
@@ -73,6 +75,43 @@ func sendEmail() error {
 	return nil
 }
 
+// Function to send message and file via Telegram
+func sendTelegram() error {
+	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	chatIDStr := os.Getenv("TELEGRAM_CHAT_ID")
+	dumpFile := os.Getenv("DUMP_FILE")
+	body := os.Getenv("MAILER_BODY")
+
+	if botToken == "" || chatIDStr == "" {
+		return fmt.Errorf("telegram bot token or chat ID not configured")
+	}
+
+	chatID, err := strconv.ParseInt(chatIDStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid chat ID: %w", err)
+	}
+
+	bot, err := tgbotapi.NewBotAPI(botToken)
+	if err != nil {
+		return fmt.Errorf("failed to create bot: %w", err)
+	}
+
+	// Send text message first
+	msg := tgbotapi.NewMessage(chatID, "PostgreSQL Backup\n\n"+body)
+	if _, err := bot.Send(msg); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	// Send dump file
+	document := tgbotapi.NewDocument(chatID, tgbotapi.FilePath(dumpFile))
+	document.Caption = "Database backup file"
+	if _, err := bot.Send(document); err != nil {
+		return fmt.Errorf("failed to send document: %w", err)
+	}
+
+	return nil
+}
+
 func main() {
 	// Load environment variables
 	if err := loadEnv(); err != nil {
@@ -85,11 +124,33 @@ func main() {
 		log.Fatalf("Database dump failed: %v", err)
 	}
 
-	fmt.Println("Backup successful, sending email...")
+	fmt.Println("Backup successful, sending notifications...")
 
-	if err := sendEmail(); err != nil {
-		log.Fatalf("Email sending failed: %v", err)
+	// Check if email is configured
+	if os.Getenv("MAILER_USERNAME") != "" && os.Getenv("MAILER_PASSWORD") != "" {
+		fmt.Println("Sending email...")
+		if err := sendEmail(); err != nil {
+			log.Printf("Email sending failed: %v", err)
+		} else {
+			fmt.Println("Email sent successfully!")
+		}
 	}
 
-	fmt.Println("Backup sent successfully!")
+	// Check if Telegram is configured
+	if os.Getenv("TELEGRAM_BOT_TOKEN") != "" && os.Getenv("TELEGRAM_CHAT_ID") != "" {
+		fmt.Println("Sending via Telegram...")
+		if err := sendTelegram(); err != nil {
+			log.Printf("Telegram sending failed: %v", err)
+		} else {
+			fmt.Println("Telegram message sent successfully!")
+		}
+	}
+
+	// Check if neither is configured
+	if (os.Getenv("MAILER_USERNAME") == "" || os.Getenv("MAILER_PASSWORD") == "") &&
+		(os.Getenv("TELEGRAM_BOT_TOKEN") == "" || os.Getenv("TELEGRAM_CHAT_ID") == "") {
+		log.Println("Warning: Neither email nor Telegram is properly configured. Backup created but not sent.")
+	}
+
+	fmt.Println("Process completed!")
 }
