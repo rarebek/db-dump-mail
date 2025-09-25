@@ -96,15 +96,9 @@ func sendTelegram() error {
 		return fmt.Errorf("failed to create bot: %w", err)
 	}
 
-	// Send text message first
-	msg := tgbotapi.NewMessage(chatID, "PostgreSQL Backup\n\n"+body)
-	if _, err := bot.Send(msg); err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
-	}
-
-	// Send dump file
+	// Send dump file with caption including the body message
 	document := tgbotapi.NewDocument(chatID, tgbotapi.FilePath(dumpFile))
-	document.Caption = "Database backup file"
+	document.Caption = "PostgreSQL Backup\n\n" + body
 	if _, err := bot.Send(document); err != nil {
 		return fmt.Errorf("failed to send document: %w", err)
 	}
